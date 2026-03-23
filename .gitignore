@@ -1,0 +1,23 @@
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Env files (VERY IMPORTANT)
+server/.env
+
+# Build folders
+dist/
+build/
+client/dist/
+client/build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# Uploads (if you store files locally)
+uploads/
+server/uploads/
