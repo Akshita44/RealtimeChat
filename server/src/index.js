@@ -17,17 +17,19 @@ import userRoutes from './routes/user.js';
 import conversationRoutes from './routes/conversations.js';
 import { Message } from './models/Message.js';
 import { Workspace } from './models/Workspace.js';
+import path from "path";
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+const _dirname = path.resolve();
 
 const io = new SocketIOServer(server, {
   cors: {
-    origin: true,
+    origin: process.env.CLIENT_ORIGIN,
     credentials: true,
-    methods: ['GET', 'POST'],
+    // methods: ['GET', 'POST'],
   },
 });
 
@@ -59,7 +61,10 @@ app.use(
   messageRoutes
 );
 app.use('/api/conversations', conversationRoutes);
-
+app.use(express.static(path.join(_dirname,"/client/dist")))
+app.get('*',(req,res)=>{
+  res.sendFile(path.resolve(_dirname,"client","dist","index.html"));
+})
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
