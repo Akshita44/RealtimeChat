@@ -17,8 +17,19 @@ router.post('/', async (req, res) => {
       return res.status(403).json({ message: 'Only admins can create workspaces' });
     }
     const { name } = req.body;
-    if (!name) {
+
+    if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Name is required' });
+    }
+
+    const existingWorkspace = await Workspace.findOne({
+      name: { $regex: `^${name.trim()}$`, $options: 'i' }
+    });
+
+    if (existingWorkspace) {
+      return res.status(400).json({
+        message: 'Workspace with this name already exists'
+      });
     }
 
     const baseSlug = slugify(name, { lower: true, strict: true });

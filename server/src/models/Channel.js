@@ -21,5 +21,7 @@ const channelSchema = new Schema(
   { timestamps: true }
 );
 
+channelSchema.index({ workspace: 1, name: 1 }, { unique: true });
+
 export const Channel = mongoose.model('Channel', channelSchema);
 

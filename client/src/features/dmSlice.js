@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { api } from '../lib/api.js';
+import { logout } from './authSlice.js';
 
 const initialState = {
   conversations: [],
@@ -215,6 +216,7 @@ markConversationAsReadLocally(state, action) {
         state.status = 'loading';
         state.error = null;
       })
+      .addCase(logout.fulfilled, () => initialState)
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.status = 'succeeded';
         state.conversations = action.payload;

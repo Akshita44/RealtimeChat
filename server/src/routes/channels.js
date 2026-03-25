@@ -43,10 +43,24 @@ async function ensureWorkspaceAdmin(req, res, next) {
 router.post('/', ensureWorkspaceAdmin, async (req, res) => {
   try {
     const { name, isPrivate } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: 'Name is required' });
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Channel name is required' });
     }
 
+    const trimmedName = name.trim();
+
+    const existing = await Channel.findOne({
+      workspace: req.workspace._id,
+      name: { $regex: `^${trimmedName}$`, $options: 'i' },
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        message: 'Channel with this name already exists in the workspace',
+      });
+    }
+    
     const channel = await Channel.create({
       name,
       workspace: req.workspace._id,

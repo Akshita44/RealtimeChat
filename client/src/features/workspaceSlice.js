@@ -5,8 +5,8 @@ import { login, register, logout, clearSession } from './authSlice.js';
 const initialState = {
   list: [],
   currentId: null,
-  status: 'idle',
-  error: null,
+  workspaceError: null,
+  status: 'idle'
 };
 
 export const fetchWorkspaces = createAsyncThunk(
@@ -74,13 +74,16 @@ const workspaceSlice = createSlice({
   reducers: {
     setCurrentWorkspace(state, action) {
       state.currentId = action.payload;
+    },
+    clearWorkspaceError(state) {
+      state.workspaceError = null;
     }
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchWorkspaces.pending, (state) => {
         state.status = 'loading';
-        state.error = null;
+        state.workspaceError = null;
       })
       .addCase(fetchWorkspaces.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -92,11 +95,15 @@ const workspaceSlice = createSlice({
       })
       .addCase(fetchWorkspaces.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload?.message || 'Failed to load workspaces';
+        state.workspaceError = action.payload?.message || 'Failed to load workspaces';
       })
       .addCase(createWorkspace.fulfilled, (state, action) => {
         state.list.push(action.payload);
         state.currentId = action.payload._id;
+      })
+      .addCase(createWorkspace.rejected, (state, action) => {
+        state.status = 'failed';
+        state.workspaceError = action.payload?.message || 'Failed to create workspace';
       })
       .addCase(removeWorkspaceMember.fulfilled, (state, action) => {
         const workspace = action.payload;
@@ -107,14 +114,6 @@ const workspaceSlice = createSlice({
           state.list[index] = workspace;
         }
       })
-      // .addCase(removeWorkspaceMember.fulfilled, (state, action) => {
-      //   const updatedWorkspace = action.payload;
-      
-      //   const workspace = state.list.find(w => w._id === updatedWorkspace._id);
-      //   if (!workspace) return;
-      
-      //   workspace.members = updatedWorkspace.members;
-      // })
       .addCase(deleteWorkspace.fulfilled, (state, action) => {
         const { workspaceId } = action.payload;
         state.list = state.list.filter((w) => w._id !== workspaceId);
@@ -138,6 +137,6 @@ const workspaceSlice = createSlice({
   },
 });
 
-export const { setCurrentWorkspace, memberAddedToWorkspace } = workspaceSlice.actions;
+export const { setCurrentWorkspace, memberAddedToWorkspace, clearWorkspaceError } = workspaceSlice.actions;
 export default workspaceSlice.reducer;
 

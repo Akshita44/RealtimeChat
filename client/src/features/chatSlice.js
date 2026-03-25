@@ -1,8 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { api } from '../lib/api.js';
+import { logout } from './authSlice.js';
 
 const initialState = {
   channels: [],
+  channelError: null,
+  status: 'idle',
   currentChannelId: null,
   messagesByChannel: {}, // channelId -> { items: [], hasMore, beforeCursor }
   typing: {}, // channelId -> { [userId]: true }
@@ -127,14 +130,16 @@ const chatSlice = createSlice({
       state.currentChannelId = action.payload;
     },
     clearChannels(state) {
-      state.channels =[];
+      state.channels = [];
       state.currentChannelId = null;
     },
-    clearAllOnlineUsers(state){
-      state.onlineUsers= {};
+    clearChannelError(state) {
+      state.channelError = null;
     },
-    addChannel(state, action)
-    {
+    clearAllOnlineUsers(state) {
+      state.onlineUsers = {};
+    },
+    addChannel(state, action) {
       const exists = state.channels.some(c => c._id === action.payload._id);
       if (!exists) {
         state.channels.push(action.payload);
@@ -142,24 +147,23 @@ const chatSlice = createSlice({
     },
     channelMemberAdded(state, action) {
       const { channelId, member } = action.payload;
-    
+
       const channel = state.channels.find(c => c._id === channelId);
       if (!channel) return;
-    
+
       if (!channel.members) channel.members = [];
-    
+
       const exists = channel.members.some(m => m._id === member._id);
       if (!exists) {
         channel.members.push(member);
       }
     },
-    removeChannel(state, action)
-    {
+    removeChannel(state, action) {
       const channelId = action.payload;
-        state.channels = state.channels.filter((c) => c._id !== channelId);
-        if (state.currentChannelId === channelId) {
-          state.currentChannelId = state.channels.length ? state.channels[0]._id : null;
-        }
+      state.channels = state.channels.filter((c) => c._id !== channelId);
+      if (state.currentChannelId === channelId) {
+        state.currentChannelId = state.channels.length ? state.channels[0]._id : null;
+      }
     },
     addMessage(state, action) {
       const { channelId, message } = action.payload;
@@ -173,7 +177,7 @@ const chatSlice = createSlice({
       const exists = bucket.items.some((m) => m._id === message._id);
       if (!exists) {
         bucket.items.unshift(message);
-      }      
+      }
     },
     updateMessage(state, action) {
       const { channelId, message } = action.payload;
@@ -198,7 +202,7 @@ const chatSlice = createSlice({
       else delete state.typing[channelId][userId];
     },
     setUserOnline(state, action) {
-      state.onlineUsers[action.payload] = true;      
+      state.onlineUsers[action.payload] = true;
     },
     setOnlineUsersBulk(state, action) {
       state.onlineUsers = action.payload;
@@ -225,19 +229,23 @@ const chatSlice = createSlice({
         const exists = state.channels.some(c => c._id === action.payload._id);
         if (!exists) {
           state.channels.push(action.payload);
-        state.currentChannelId = action.payload._id;
+          state.currentChannelId = action.payload._id;
         }
       })
+      .addCase(createChannel.rejected, (state, action) => {
+        state.status = 'failed';
+        state.channelError = action.payload?.message || 'Channel creation failed';
+      })
+      .addCase(logout.fulfilled, () => initialState)
       .addCase(addChannelMember.fulfilled, (state, action) => {
         const { channelId, member } = action.payload;
-    
-      const channel = state.channels.find(c => c._id === channelId);
-      if (!channel) return;
-      if (!channel.members) channel.members = [];
-      const exists = channel.members.some(m => m._id === member._id);
-      if (!exists) {
-        channel.members.push(member);
-      }
+        const channel = state.channels.find(c => c._id === channelId);
+        if (!channel) return;
+        if (!channel.members) channel.members = [];
+        const exists = channel.members.some(m => m._id === member._id);
+        if (!exists) {
+          channel.members.push(member);
+        }
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
         const { channelId, messages, replace } = action.payload;
@@ -274,25 +282,25 @@ const chatSlice = createSlice({
         }
       })
       .addCase(toggleReaction.fulfilled, (state, action) => {
-  const { channelId, message } = action.payload;
-  const bucket = state.messagesByChannel[channelId];
-  if (!bucket) return;
-  const idx = bucket.items.findIndex((m) => m._id === message._id);
-  if (idx >= 0) bucket.items[idx] = {...message};
-})
-.addCase(editMessage.fulfilled, (state, action) => {
-  const { channelId, message } = action.payload;
-  const bucket = state.messagesByChannel[channelId];
-  if (!bucket) return;
-  const idx = bucket.items.findIndex((m) => m._id === message._id);
-  if (idx >= 0) bucket.items[idx] = message;
-})
-.addCase(deleteMessage.fulfilled, (state, action) => {
-  const { channelId, messageId } = action.payload;
-  const bucket = state.messagesByChannel[channelId];
-  if (!bucket) return;
-  bucket.items = bucket.items.filter((m) => m._id !== messageId);
-})
+        const { channelId, message } = action.payload;
+        const bucket = state.messagesByChannel[channelId];
+        if (!bucket) return;
+        const idx = bucket.items.findIndex((m) => m._id === message._id);
+        if (idx >= 0) bucket.items[idx] = { ...message };
+      })
+      .addCase(editMessage.fulfilled, (state, action) => {
+        const { channelId, message } = action.payload;
+        const bucket = state.messagesByChannel[channelId];
+        if (!bucket) return;
+        const idx = bucket.items.findIndex((m) => m._id === message._id);
+        if (idx >= 0) bucket.items[idx] = message;
+      })
+      .addCase(deleteMessage.fulfilled, (state, action) => {
+        const { channelId, messageId } = action.payload;
+        const bucket = state.messagesByChannel[channelId];
+        if (!bucket) return;
+        bucket.items = bucket.items.filter((m) => m._id !== messageId);
+      })
   },
 });
 
@@ -309,7 +317,8 @@ export const {
   removeChannel,
   channelMemberAdded,
   clearAllOnlineUsers,
-  setOnlineUsersBulk
+  setOnlineUsersBulk,
+  clearChannelError
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

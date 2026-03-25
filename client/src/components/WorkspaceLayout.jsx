@@ -30,6 +30,8 @@ import { getSocket } from '../lib/socket.js';
 import { ChannelView } from './ChannelView.jsx';
 import { DirectMessageView } from './DirectMessageView.jsx';
 import { searchUsers, clearSearchResults } from '../features/usersearchSlice.js';
+import { clearWorkspaceError } from '../features/workspaceSlice.js';
+import { clearChannelError } from '../features/chatSlice.js';
 
 export function WorkspaceLayout() {
   const dispatch = useDispatch();
@@ -38,6 +40,8 @@ export function WorkspaceLayout() {
   const { channels, currentChannelId } = useSelector((state) => state.chat);
   const { searchResults } = useSelector((state) => state.usersearch);
   const { conversations, currentConversationId } = useSelector((state) => state.dm);
+  const { workspaceError} = useSelector((state) => state.workspaces);
+  const { channelError} = useSelector((state) => state.chat);
   const theme = useSelector((state) => state.ui.theme);
   const user = useSelector((state) => state.auth.user);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -51,9 +55,11 @@ export function WorkspaceLayout() {
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const [removeSearch, setRemoveSearch] = useState('');
 const [showRemoveDropdown, setShowRemoveDropdown] = useState(false);
+const [sidebarOpen, setSidebarOpen] = useState(false);
 const workspaceDropdownRef = useRef(null);
 const removeDropdownRef = useRef(null);
 const dmDropdownRef = useRef(null);
+const sidebarRef = useRef(null);
   useEffect(() => {
     if (!user) return;
     dispatch(fetchWorkspaces());
@@ -114,6 +120,13 @@ const dmDropdownRef = useRef(null);
         !dmDropdownRef.current.contains(e.target)
       ) {
         setShowUserDropdown(false);
+      }
+
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target)
+      ) {
+        setSidebarOpen(false);
       }
     };
   
@@ -185,8 +198,9 @@ const dmDropdownRef = useRef(null);
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className={`app-shell theme-${theme}`}>
-      <aside className="sidebar">
+    <div className={`app-shell theme-${theme} ${sidebarOpen ? 'sidebar-open' : ''}`}>
+    {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+    <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} ref={sidebarRef}>
         <div className="sidebar-section">
           <div className="sidebar-header">
             <span>Workspaces</span>
@@ -194,7 +208,10 @@ const dmDropdownRef = useRef(null);
               <button
                 type="button"
                 className="ghost"
-                onClick={() => setCreating(true)}
+                onClick={() => {
+                  setCreating(true)
+                  dispatch(clearWorkspaceError());
+                }}
                 title="Create workspace"
               >
                 ＋
@@ -227,8 +244,11 @@ const dmDropdownRef = useRef(null);
                 type="text"
                 placeholder="New workspace name"
                 value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
+                onChange={(e) => {setNewWorkspaceName(e.target.value)
+                dispatch(clearWorkspaceError());
+                }}
               />
+              {workspaceError && <p className="error">{workspaceError}</p>}
               <button type="submit" disabled={!newWorkspaceName.trim()}>
                 Create
               </button>
@@ -301,8 +321,12 @@ const dmDropdownRef = useRef(null);
                 type="text"
                 placeholder="New channel name"
                 value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
+                onChange={(e) => {
+                setNewChannelName(e.target.value)
+                dispatch(clearChannelError());
+                }}
               />
+              {channelError && <p className="error">{channelError}</p>}
               <label className="inline-toggle">
                 <input
                   type="checkbox"
@@ -319,7 +343,9 @@ const dmDropdownRef = useRef(null);
                 <NavLink
                   to={`/app/channel/${ch._id}`}
                   className={({ isActive }) => (isActive ? 'active' : '')}
-                  onClick={() => dispatch(setCurrentChannel(ch._id))}
+                  onClick={() => {dispatch(setCurrentChannel(ch._id))
+                    setSidebarOpen(false);
+                  }}
                 >
                   {ch.isPrivate ? '🔒' : '#'} {ch.name}
                 </NavLink>
@@ -344,6 +370,7 @@ const dmDropdownRef = useRef(null);
     type="text"
     className='sidebar-input'
     placeholder="Add member to workspace..."
+    title="Add member to workspace..."
     value={workspaceUserSearch}
     onChange={(e) => {
       setWorkspaceUserSearch(e.target.value);
@@ -382,6 +409,7 @@ const dmDropdownRef = useRef(null);
     type="text"
     className='sidebar-input'
     placeholder="Remove member from workspace..."
+    title="Remove member from workspace..."
     value={removeSearch}
     onChange={(e) => {
       setRemoveSearch(e.target.value);
@@ -451,6 +479,7 @@ const dmDropdownRef = useRef(null);
                   onClick={() => {
                     dispatch(setCurrentConversationId(conv._id));
                     navigate(`/app/dm/${conv._id}`);
+                    setSidebarOpen(false);
                   }}
                 >
                   {label}
@@ -469,6 +498,9 @@ const dmDropdownRef = useRef(null);
               if (socket) {
                 socket.disconnect();
               }
+              setNewChannelName('');
+              setNewWorkspaceName('');
+              setCreating(false);
               await dispatch(logout());
               navigate('/login');
             }}
@@ -478,10 +510,18 @@ const dmDropdownRef = useRef(null);
         </div>
       </aside>
       <main className="main-pane">
+      <div className="mobile-header">
+  <button
+    className="hamburger"
+    onClick={() => setSidebarOpen(prev => !prev)}
+  >
+    ☰
+  </button>
+</div>
         <Routes>
           <Route path="channel/:channelId" element={<ChannelView />} />
           <Route path="dm/:conversationId" element={<DirectMessageView />} />
-          <Route path="*" element={<p>Select a channel to start chatting.</p>} />
+          <Route path="*" element={<p className='select-channel-p'> Select a channel to start chatting.</p>} />
         </Routes>
       </main>
       {confirm && (

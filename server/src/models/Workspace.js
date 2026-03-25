@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 
 const workspaceSchema = new Schema(
   {
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true, unique: true},
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     owner: {
       type: Schema.Types.ObjectId,
